@@ -15,7 +15,7 @@ from langchain_community.agent_toolkits import SQLDatabaseToolkit
 from typing import TypedDict, Annotated, Literal
 from sqlalchemy import text
 from sqlalchemy import text
-from prompts import suggest_rule_prompt, generate_query_system_prompt, check_query_system_prompt
+from prompts import suggest_rule_prompt, generate_query_system_prompt, check_query_system_prompt, col_know_all_prompt_with_rules
 
 import os
 
@@ -224,10 +224,10 @@ def load_col_values(table_name, column_name, offset, limit):
 # ------------------------------------------ agents and llm calls ---------------------------------------------------
 
 # Agent - Tells stuff on the column and helps to create rules
-def know_all_agent(prompt, db, llm, checkpointer):
+def know_all_agent():
 
     # llm bind with tools
-    tools = get_sql_tools(db,llm)
+    tools = get_sql_tools(db_source,llm)
     llm_with_tools = llm.bind_tools(tools)
 
     # Define class
@@ -238,7 +238,7 @@ def know_all_agent(prompt, db, llm, checkpointer):
     # Nodes
     def chat_node(state: ChatState):
         
-        prompt_template = PromptTemplate(input_variables=["current_column"], template=prompt)
+        prompt_template = PromptTemplate(input_variables=["current_column"], template=col_know_all_prompt_with_rules)
         system_prompt = prompt_template.format(current_column=state["current_column"])
         system_message = SystemMessage(content=system_prompt)
         messages = [system_message] + state["messages"]
@@ -369,10 +369,11 @@ def convert_rule_to_sql(rule, table_name, column_name):
 
     return query_ready, output
 
-def call_know_all_agent(user_input, prompt):
-    llm = get_llm()
-    db = get_db(DATA_BASE_PATH_SOURCE)
-    chatbot = know_all_agent(prompt, db, llm, checkpointer)
+
+chatbot = know_all_agent()
+
+def call_know_all_agent():
+    
     response = chatbot.invoke({"messages":[HumanMessage(content=user_input)],"current_column":"postcode"},
                     config={"configurable":{"thread_id":"thread_id-1"}})
     return response["messages"][-1].content
