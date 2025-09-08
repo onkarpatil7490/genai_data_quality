@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from utils import convert_rule_to_sql, insert_rule, delete_rule, get_rule_on_column_agent
+from utils import convert_rule_to_sql, insert_rule, delete_rule, get_rule_on_column_agent, get_all_rules_of_table
 import uuid
 
 app = FastAPI()
@@ -9,13 +9,13 @@ app = FastAPI()
 """
 1. load data
 2. see data (scrollable)
-3. get rule suggestion: input - column name, table name, existing rules (optional); output - suggested rule
-4. convert rule to sql: input - table name, column name, rule; output - sql query #####
+3. get rule suggestion: input - column name, table name, existing rules (optional); output - suggested rule ---------
+4. convert rule to sql: input - table name, column name, rule; output - sql query -----------
 5. validate query: input - sql query, column name, table name; output - valid/invalid percentage, column data show
-6. add rule: input - table name, column name, rule text; output - success/failure ######
-7. delete rule: input - rule id; output - success/failure ########
-8. list rules: input - table name, column name (optional); output - list of rules
-9. chat with ai agent: input - user query, column name, table name; output - ai response
+6. add rule: input - table name, column name, rule text; output - success/failure -------------
+7. delete rule: input - rule id; output - success/failure --------------
+8. list rules: input - table name, column name (optional); output - list of rules -----------
+9. chat with ai agent: input - user query, column name, table name; output - ai response 
 10. rule exporting from chat: input - chat conversation; output - success/failure
 """
 
@@ -43,3 +43,10 @@ def delete_rule_api(rule_id: str):
 def get_rule_suggestion_api(table_name: str, column_name: str, existing_rules: list[str] = Query(default=[])):
     suggested_rule = get_rule_on_column_agent(column_name, table_name, existing_rules)
     return JSONResponse(content={"suggested_rule": suggested_rule})
+
+# get rules for a table
+@app.get("/get_all_rules_of_table/")
+def get_all_rules_of_table_api(table_name: str):
+    rules = get_all_rules_of_table(table_name)
+    return JSONResponse(content={"rules": rules})
+

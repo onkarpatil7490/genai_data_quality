@@ -146,6 +146,19 @@ def get_existing_rules_on_column(column_name, table_name):
     results = ast.literal_eval(results)
     flat_list = [r[0] for r in results]
     return flat_list
+
+def get_all_rules_of_table(table_name):
+    query = f"SELECT rule, table_name, column_name, rule_category, sql_query FROM rule_storage WHERE table_name = '{table_name}'"
+    results = db_rules.run(query)
+    # breakpoint()
+    if not results:
+        return []
+    results = ast.literal_eval(results)
+    keys = ["rule", "table_name", "column_name", "rule_category", "sql_query"]
+    # convert each tuple into a dictionary
+    dict_list = [dict(zip(keys, row)) for row in results]
+
+    return dict_list
 # ------------------------------------------ agents ---------------------------------------------------
 
 # Agent - Tells stuff on the column and helps to create rules

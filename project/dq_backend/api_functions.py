@@ -1,6 +1,6 @@
-from utils import get_rule_on_column_agent
+from utils import get_rule_on_column_agent, get_all_rules
 
-column_name = "postcode"
 table_name = "conventional_power_plants_DE"
-existing_rules = []
-suggested_rule = get_rule_on_column_agent(column_name, table_name, existing_rules)
+# table_name = "zzzzzzzz"
+all_rules = get_all_rules(table_name)
+breakpoint()
