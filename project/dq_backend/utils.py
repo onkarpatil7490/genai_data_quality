@@ -2,6 +2,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_community.utilities.sql_database import SQLDatabase
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
+import ast
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import StaticPool
 from langgraph.checkpoint.memory import MemorySaver
@@ -13,7 +14,8 @@ from langchain_core.prompts import PromptTemplate
 from langchain_community.agent_toolkits import SQLDatabaseToolkit
 from typing import TypedDict, Annotated, Literal
 from sqlalchemy import text
-from prompts import suggest_rule_prompt
+from sqlalchemy import text
+from prompts import suggest_rule_prompt, generate_query_system_prompt, check_query_system_prompt
 
 import os
 
@@ -23,24 +25,33 @@ checkpointer = MemorySaver()
 load_dotenv()
 
 # Paths
-DATA_BASE_PATH = r"C:\Users\OnkarPatil\Desktop\genai_data_quality\project\data"
-DB_PATH = os.path.join(DATA_BASE_PATH, "conventional_power_plants", "conventional_power_plants.sqlite")
+DATA_BASE_PATH_SOURCE = r"C:\Users\OnkarPatil\Desktop\genai_data_quality\project\data\source_data"
+DB_PATH_SOURCE = os.path.join(DATA_BASE_PATH_SOURCE, "conventional_power_plants", "conventional_power_plants.sqlite")
+
+DATA_BASE_PATH_RULES = r"C:\Users\OnkarPatil\Desktop\genai_data_quality\project\data\rules"
+DB_PATH_RULES = os.path.join(DATA_BASE_PATH_RULES, "rule_management.sqlite")
+
 
 
 # --------------------------------------- general utils ----------------------------------------------
 
-# Load database
-def load_database(db_path=DB_PATH) -> Engine:
+def load_database(db_path=DATA_BASE_PATH_SOURCE) -> Engine:
     """Engine for opsd data."""
     return create_engine(f"sqlite:///{db_path}", poolclass=StaticPool)
 
-# Get necessary components for the agent
-def get_stuff():
-    """Get the necessary components for the agent."""
+def get_llm():
     llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
-    engine = load_database()
+    return llm
+
+def get_db(db_path):
+    engine = create_engine(f"sqlite:///{db_path}", poolclass=StaticPool)
     db = SQLDatabase(engine)
-    return llm, db
+    return db
+
+llm = get_llm()
+db_source = get_db(DB_PATH_SOURCE)
+db_rules = get_db(DB_PATH_RULES)
+
 
 # Get schema of a table
 def get_schema_of_table(table, db, llm):
@@ -98,15 +109,21 @@ def get_bad_rows_num(query: str):
         return [row[0] for row in rows]
     
 # Run query
-def run_query(query: str):
-    engine = load_database()
+def run_query(query: str, db_path=DATA_BASE_PATH_SOURCE):
+    engine = load_database(db_path)
     with engine.connect() as conn:
         result = conn.execute(text(query))
         return result.fetchall()
 
-from sqlalchemy import text
+def insert_rule(rule_id, rule, table_name, column_name, rule_category, sql_query):
+    query = f"""
+        INSERT INTO rule_storage (rule_id, rule, table_name, column_name, rule_category, sql_query)
+        VALUES ('{rule_id}', '{rule}', '{table_name}', '{column_name}', '{rule_category}', '{sql_query}')
+    """
+    db_rules.run(query)
+    print(f"✅ Rule '{rule_id}' inserted successfully.")
 
-def get_top_values(table_name: str, column_name: str, limit: int = 200):
+def get_top_values(table_name: str, column_name: str, db_path=DATA_BASE_PATH_SOURCE, limit: int = 200):
     query = f"""
         SELECT {column_name}, COUNT(*) AS value_count
         FROM {table_name}
@@ -114,9 +131,21 @@ def get_top_values(table_name: str, column_name: str, limit: int = 200):
         ORDER BY value_count DESC
         LIMIT {limit};
     """
-    return run_query(query)
+    return run_query(query, db_path)
 
+def delete_rule(rule_id):
+    query = f"DELETE FROM rule_storage WHERE rule_id = '{rule_id}'"
+    db_rules.run(query)
+    print(f"✅ Rule '{rule_id}' deleted successfully (if it existed).")
 
+def get_existing_rules_on_column(column_name, table_name):
+    query = f"SELECT rule FROM rule_storage WHERE column_name = '{column_name}' AND table_name = '{table_name}'"
+    results = db_rules.run(query)
+    if not results:
+        return []
+    results = ast.literal_eval(results)
+    flat_list = [r[0] for r in results]
+    return flat_list
 # ------------------------------------------ agents ---------------------------------------------------
 
 # Agent - Tells stuff on the column and helps to create rules
@@ -214,10 +243,11 @@ def rule_to_sql_agent(llm, db, checkpointer, table_name, schema, column_name, ge
 # llm call - Get data quality rule for a specific column
 def get_rule_on_column_agent(column_name, table_name, existing_rules):
 
-    llm, db = get_stuff()
+    llm = get_llm()
+    db = get_db(DB_PATH_SOURCE)
     schema = get_schema_of_table(table_name, db, llm)
-    values = get_top_values(table_name, column_name, limit=200)
-
+    values = get_top_values(table_name, column_name, db_path=DB_PATH_SOURCE, limit=200)
+    existing_rules = get_existing_rules_on_column(column_name, table_name)
     prompt_template = PromptTemplate(input_variables=["existing_rules","column","table_name","schema","values"], template=suggest_rule_prompt)
     system_prompt = prompt_template.format(existing_rules=existing_rules, column=column_name, table_name=table_name, schema=schema, values=values)
     system_message = SystemMessage(content=system_prompt)
@@ -238,9 +268,10 @@ def get_rule_from_response(llm, get_rule_out_prompt, response):
 
 # ---------------------------------------- process agent outputs ----------------------------------------------
 
-def convert_rule_to_sql(checkpointer, rule, table_name, column_name, generate_query_system_prompt, check_query_system_prompt):
+def convert_rule_to_sql(rule, table_name, column_name):
 
-    llm,db = get_stuff()
+    llm = get_llm()
+    db = get_db(DATA_BASE_PATH_SOURCE)
     schema = get_schema_of_table(table_name, db, llm)
     agent = rule_to_sql_agent(llm, db, checkpointer, table_name, schema, column_name, generate_query_system_prompt, check_query_system_prompt)
     user_input = rule
@@ -264,7 +295,8 @@ def convert_rule_to_sql(checkpointer, rule, table_name, column_name, generate_qu
     return query_ready, output
 
 def call_know_all_agent(user_input, prompt):
-    llm, db = get_stuff()
+    llm = get_llm()
+    db = get_db(DATA_BASE_PATH_SOURCE)
     chatbot = know_all_agent(prompt, db, llm, checkpointer)
     response = chatbot.invoke({"messages":[HumanMessage(content=user_input)],"current_column":"postcode"},
                     config={"configurable":{"thread_id":"thread_id-1"}})

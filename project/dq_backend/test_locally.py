@@ -1,4 +1,4 @@
-from utils import get_stuff, checkpointer, call_know_all_agent, \
+from utils import get_llm, get_db, DATA_BASE_PATH_SOURCE, checkpointer, call_know_all_agent, \
 get_schema_of_table, convert_rule_to_sql, get_rule_on_column_agent, \
       get_rule_from_response, list_tables, run_query, get_bad_rows_num
 from prompts import col_know_all_prompt_with_rules, suggest_rule_prompt, get_rule_out_prompt, \
@@ -7,7 +7,8 @@ generate_query_system_prompt, check_query_system_prompt
 # inputs
 column_name = "postcode"
 existing_rules = []
-llm, db = get_stuff()
+llm = get_llm()
+db = get_db(DATA_BASE_PATH_SOURCE)
 table_name = list_tables(db,llm)
 schema = get_schema_of_table(table_name, db, llm)
 # breakpoint()

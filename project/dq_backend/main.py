@@ -1,21 +1,45 @@
 from fastapi import FastAPI, Query
-from sqlalchemy import MetaData, Table, select
 from fastapi.responses import JSONResponse
-from utils import load_database, list_tables, get_stuff, get_rule_on_column_agent
-from project.dq_backend.api_functions import convert_rule_to_sql_api
+from utils import convert_rule_to_sql, insert_rule, delete_rule, get_rule_on_column_agent
+import uuid
 
 app = FastAPI()
-llm, db = get_stuff()
-table_name = list_tables(db, llm)
-engine = load_database()
-metadata = MetaData()
-metadata.reflect(bind=engine)
 
+# need apis for 
+"""
+1. load data
+2. see data (scrollable)
+3. get rule suggestion: input - column name, table name, existing rules (optional); output - suggested rule
+4. convert rule to sql: input - table name, column name, rule; output - sql query #####
+5. validate query: input - sql query, column name, table name; output - valid/invalid percentage, column data show
+6. add rule: input - table name, column name, rule text; output - success/failure ######
+7. delete rule: input - rule id; output - success/failure ########
+8. list rules: input - table name, column name (optional); output - list of rules
+9. chat with ai agent: input - user query, column name, table name; output - ai response
+10. rule exporting from chat: input - chat conversation; output - success/failure
+"""
 
-# table_name = "conventional_power_plants_DEe"
-# column_name = "postcode"
-# rule = "The 'postcode' column should always contain values that are exactly 5 characters long."
+# convert rule to sql
 @app.get("/convert_rule_to_sql/")
-def convert_rule_to_sql_api_okay(table_name: str, column_name: str, rule: str):
-    output = convert_rule_to_sql_api(table_name, column_name, rule)
+def convert_rule_to_sql_api(table_name: str, column_name: str, rule: str):
+    output = convert_rule_to_sql(rule, table_name, column_name)
     return JSONResponse(content={"sql": output})
+
+# add rule in the rules storage table
+@app.put("/add_rule/")
+def add_rule_api(rule: str, table_name: str, column_name: str, rule_category: str, sql_query: str):
+    rule_id = str(uuid.uuid4())
+    insert_rule(rule_id, rule, table_name, column_name, rule_category, sql_query)
+    return JSONResponse(content={"message": f"Rule '{rule_id}' inserted successfully."})
+
+# delete rule from the rules storage table
+@app.delete("/delete_rule/")
+def delete_rule_api(rule_id: str):  
+    delete_rule(rule_id)
+    return JSONResponse(content={"message": f"Rule '{rule_id}' deleted successfully (if it existed)."})
+
+# get rule suggestion from AI
+@app.get("/get_rule_suggestion/")
+def get_rule_suggestion_api(table_name: str, column_name: str, existing_rules: list[str] = Query(default=[])):
+    suggested_rule = get_rule_on_column_agent(column_name, table_name, existing_rules)
+    return JSONResponse(content={"suggested_rule": suggested_rule})
