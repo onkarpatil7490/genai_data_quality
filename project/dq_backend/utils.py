@@ -31,18 +31,17 @@ DB_PATH_SOURCE = os.path.join(DATA_BASE_PATH_SOURCE, "conventional_power_plants"
 DATA_BASE_PATH_RULES = r"C:\Users\OnkarPatil\Desktop\genai_data_quality\project\data\rules"
 DB_PATH_RULES = os.path.join(DATA_BASE_PATH_RULES, "rule_management.sqlite")
 
-
-
-# --------------------------------------- general utils ----------------------------------------------
-
+# Load database
 def load_database(db_path=DATA_BASE_PATH_SOURCE) -> Engine:
     """Engine for opsd data."""
     return create_engine(f"sqlite:///{db_path}", poolclass=StaticPool)
 
+# Get llm
 def get_llm():
     llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
     return llm
 
+# Get db
 def get_db(db_path):
     engine = create_engine(f"sqlite:///{db_path}", poolclass=StaticPool)
     db = SQLDatabase(engine)
@@ -52,6 +51,7 @@ llm = get_llm()
 db_source = get_db(DB_PATH_SOURCE)
 db_rules = get_db(DB_PATH_RULES)
 
+# --------------------------------------- general utils ----------------------------------------------
 
 # Get schema of a table
 def get_schema_of_table(table, db, llm):
@@ -100,14 +100,29 @@ def list_tables(db,llm):
     tool_message = list_tables_tool.invoke(tool_call)
     return tool_message.content
 
-# Get number of bad rows
-def get_bad_rows_num(query: str):
-    engine = load_database()
-    with engine.connect() as conn:
-        result = conn.execute(text(query))
-        rows = result.fetchall()
-        return [row[0] for row in rows]
+# Get stats for query testing/validation on a column
+def get_query_test_results(query: str, column_name, table_name):
+    results = db_source.run(query)
+    results = ast.literal_eval(results)
+    list_good_rows = [row[0] for row in results]
     
+    query_to_get_total_rows = f"SELECT COUNT({column_name}) AS row_count FROM {table_name};"
+    result = db_source.run(query_to_get_total_rows)
+    if result:
+        result = ast.literal_eval(result)
+        total_rows = result[0][0]
+        percentage_bad_rows = (len(list_good_rows)*100)/total_rows
+    else:
+        total_rows = None
+        percentage_bad_rows = None
+
+    return {
+        "total_rows":total_rows,
+        "total_good_rows":len(list_good_rows),
+        "percentage_bad_rows":percentage_bad_rows,
+        "list_good_rows":list_good_rows,
+    }
+
 # Run query
 def run_query(query: str, db_path=DATA_BASE_PATH_SOURCE):
     engine = load_database(db_path)
@@ -115,6 +130,7 @@ def run_query(query: str, db_path=DATA_BASE_PATH_SOURCE):
         result = conn.execute(text(query))
         return result.fetchall()
 
+# Insert rule in the rules storage table
 def insert_rule(rule_id, rule, table_name, column_name, rule_category, sql_query):
     query = f"""
         INSERT INTO rule_storage (rule_id, rule, table_name, column_name, rule_category, sql_query)
@@ -123,6 +139,7 @@ def insert_rule(rule_id, rule, table_name, column_name, rule_category, sql_query
     db_rules.run(query)
     print(f"✅ Rule '{rule_id}' inserted successfully.")
 
+# Get top values from a column
 def get_top_values(table_name: str, column_name: str, db_path=DATA_BASE_PATH_SOURCE, limit: int = 200):
     query = f"""
         SELECT {column_name}, COUNT(*) AS value_count
@@ -133,11 +150,13 @@ def get_top_values(table_name: str, column_name: str, db_path=DATA_BASE_PATH_SOU
     """
     return run_query(query, db_path)
 
+# Delete rule from the rules storage table
 def delete_rule(rule_id):
     query = f"DELETE FROM rule_storage WHERE rule_id = '{rule_id}'"
     db_rules.run(query)
     print(f"✅ Rule '{rule_id}' deleted successfully (if it existed).")
 
+# Get existing rules on a column
 def get_existing_rules_on_column(column_name, table_name):
     query = f"SELECT rule FROM rule_storage WHERE column_name = '{column_name}' AND table_name = '{table_name}'"
     results = db_rules.run(query)
@@ -147,6 +166,7 @@ def get_existing_rules_on_column(column_name, table_name):
     flat_list = [r[0] for r in results]
     return flat_list
 
+# Get all rules for a table
 def get_all_rules_of_table(table_name):
     query = f"SELECT rule, table_name, column_name, rule_category, sql_query FROM rule_storage WHERE table_name = '{table_name}'"
     results = db_rules.run(query)
@@ -159,7 +179,49 @@ def get_all_rules_of_table(table_name):
     dict_list = [dict(zip(keys, row)) for row in results]
 
     return dict_list
-# ------------------------------------------ agents ---------------------------------------------------
+
+# load table and its values - chunk by chunk
+def load_table_values(table_name, offset, limit):
+    query = f"""
+    SELECT * 
+    FROM {table_name} 
+    LIMIT {limit} OFFSET {offset}
+    """
+    results = db_source.run(query)  # returns list of tuples
+    if not results:
+        return None, None
+    results = ast.literal_eval(results)
+    
+    columns_query = f"PRAGMA table_info({table_name})"  # For SQLite, get column names
+    column_result = db_source.run(columns_query)
+    if not column_result:
+        return None, None
+    column_result = ast.literal_eval(column_result)
+    columns = [col[1] for col in column_result]
+    
+    # Convert to list of dicts
+    data = [dict(zip(columns, row)) for row in results]
+    return columns, data
+
+# load column and values
+def load_col_values(table_name, column_name, offset, limit):
+    query = f"""
+        SELECT {column_name}
+        FROM {table_name}
+        LIMIT {limit} OFFSET {offset}
+    """
+    results = db_source.run(query)
+    if not results:
+        return None
+    
+    results = ast.literal_eval(results)
+    values_dict = {}
+    for i, row in enumerate(results):
+        values_dict[offset + i + 1] = row[0]
+    
+    return values_dict
+
+# ------------------------------------------ agents and llm calls ---------------------------------------------------
 
 # Agent - Tells stuff on the column and helps to create rules
 def know_all_agent(prompt, db, llm, checkpointer):
@@ -254,7 +316,7 @@ def rule_to_sql_agent(llm, db, checkpointer, table_name, schema, column_name, ge
     return agent
 
 # llm call - Get data quality rule for a specific column
-def get_rule_on_column_agent(column_name, table_name, existing_rules):
+def get_rule_suggestion_on_column(column_name, table_name, existing_rules):
 
     llm = get_llm()
     db = get_db(DB_PATH_SOURCE)
@@ -284,7 +346,7 @@ def get_rule_from_response(llm, get_rule_out_prompt, response):
 def convert_rule_to_sql(rule, table_name, column_name):
 
     llm = get_llm()
-    db = get_db(DATA_BASE_PATH_SOURCE)
+    db = get_db(DB_PATH_SOURCE)
     schema = get_schema_of_table(table_name, db, llm)
     agent = rule_to_sql_agent(llm, db, checkpointer, table_name, schema, column_name, generate_query_system_prompt, check_query_system_prompt)
     user_input = rule

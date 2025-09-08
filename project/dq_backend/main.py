@@ -1,6 +1,10 @@
+# THIS SCRIPT IS CONTAINS THE API ENDPOINTS
+# RUN WITH "uvicorn main:app --reload"
+
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from utils import convert_rule_to_sql, insert_rule, delete_rule, get_rule_on_column_agent, get_all_rules_of_table
+from utils import convert_rule_to_sql, insert_rule, delete_rule, get_rule_suggestion_on_column, \
+    get_all_rules_of_table, get_query_test_results, load_table_values, load_col_values
 import uuid
 
 app = FastAPI()
@@ -11,7 +15,7 @@ app = FastAPI()
 2. see data (scrollable)
 3. get rule suggestion: input - column name, table name, existing rules (optional); output - suggested rule ---------
 4. convert rule to sql: input - table name, column name, rule; output - sql query -----------
-5. validate query: input - sql query, column name, table name; output - valid/invalid percentage, column data show
+5. validate query: input - sql query, column name, table name; output - valid/invalid percentage, column data show --------------
 6. add rule: input - table name, column name, rule text; output - success/failure -------------
 7. delete rule: input - rule id; output - success/failure --------------
 8. list rules: input - table name, column name (optional); output - list of rules -----------
@@ -41,12 +45,32 @@ def delete_rule_api(rule_id: str):
 # get rule suggestion from AI
 @app.get("/get_rule_suggestion/")
 def get_rule_suggestion_api(table_name: str, column_name: str, existing_rules: list[str] = Query(default=[])):
-    suggested_rule = get_rule_on_column_agent(column_name, table_name, existing_rules)
+    suggested_rule = get_rule_suggestion_on_column(column_name, table_name, existing_rules)
     return JSONResponse(content={"suggested_rule": suggested_rule})
 
-# get rules for a table
+# get rules of a table
 @app.get("/get_all_rules_of_table/")
 def get_all_rules_of_table_api(table_name: str):
     rules = get_all_rules_of_table(table_name)
     return JSONResponse(content={"rules": rules})
+
+# test/validate the query
+@app.get("/validate_query/")
+def validate_query_api(sql_query: str, table_name: str, column_name: str):
+    stats_dict = get_query_test_results(sql_query, column_name, table_name)
+    return JSONResponse(content={"stats": stats_dict})
+
+# load source data
+@app.get("/get_table_data/")
+def get_table_data(table_name: str, offset: int = 0, limit: int = 100):
+    columns, data = load_table_values(table_name, offset, limit)
+    return JSONResponse(content={"columns": columns, "rows": data})
+
+# load column data
+@app.get("/get_table_data/")
+def get_table_data(table_name: str, column_name:str, offset: int = 0, limit: int = 100):
+    data = load_col_values(table_name, column_name, offset, limit)
+    return JSONResponse(content={"rows": data})
+
+
 
