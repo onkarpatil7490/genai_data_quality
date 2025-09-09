@@ -20,8 +20,9 @@ venv\Scripts\activate
 pip install -r requirements.txt
 
 ### 3. Run the API Server
-https://github.com/onkarpatil7490/genai_data_quality/blob/main/project/dq_backend/main.py
-Navigate to the backend directory (if not already there) and start the server:
+
+Navigate to the below path and start the server:
+https://github.com/onkarpatil7490/genai_data_quality/blob/main/project/dq_backend
 
 uvicorn main:app --reload
 
