@@ -96,6 +96,7 @@ Rules for query generation:
 5. Do NOT run the query; just generate it.
 
 Below is one example you can use for reference - 
+COLUMN: postcode
 RULE:  The 'postcode' column should always contain values that are exactly 5 characters long.
 QUERY:  SELECT ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS row_num FROM conventional_power_plants_DE WHERE LENGTH(postcode) != 5
 If the requirement is unclear, ask a clarifying question to the user before generating the query.
