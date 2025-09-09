@@ -6,37 +6,33 @@ Users can write rules in natural language, which are automatically converted to 
 ## 🚀 Setup Guide
 
 ### 1. Create a Virtual Environment
-python -m venv venv
+Command: python -m venv venv
 
 Activate it:
 
-Linux / macOS:
-source venv/bin/activate
-
 Windows:
-venv\Scripts\activate
+Command: venv\Scripts\activate
 
 ### 2. Install Requirements
-pip install -r requirements.txt
+Command: pip install -r requirements.txt
 
 ### 3. Run the API Server
 
 Navigate to the below path and start the server:
+
 https://github.com/onkarpatil7490/genai_data_quality/blob/main/project/dq_backend
 
-uvicorn main:app --reload
+Command: uvicorn main:app --reload
 
 This will run the API server locally.  
 Default URL → http://127.0.0.1:8000
 
 ### 4. Open the API Docs
 1. Open your browser and go to http://127.0.0.1:8000  
-2. At the end of the URL, add /docs and hit Enter  
+2. At the end of the URL, add "/docs" and hit Enter  
 
 You will see the **Swagger UI documentation** where you can test all APIs interactively.   
 
 
 ## ✅ Next Steps
-- Define and manage data quality rules using natural language.  
-- Test the endpoints directly in the /docs page.  
-- Integrate the rules with your ETL pipelines to validate and transform data automatically.  
+- Test the endpoints directly in the /docs page.    
