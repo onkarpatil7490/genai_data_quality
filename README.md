@@ -20,6 +20,7 @@ venv\Scripts\activate
 pip install -r requirements.txt
 
 ### 3. Run the API Server
+https://github.com/onkarpatil7490/genai_data_quality/blob/main/project/dq_backend/main.py
 Navigate to the backend directory (if not already there) and start the server:
 
 uvicorn main:app --reload
@@ -31,11 +32,8 @@ Default URL → http://127.0.0.1:8000
 1. Open your browser and go to http://127.0.0.1:8000  
 2. At the end of the URL, add /docs and hit Enter  
 
-You will see the **Swagger UI documentation** where you can test all APIs interactively.  
+You will see the **Swagger UI documentation** where you can test all APIs interactively.   
 
-## 📂 Project Reference
-Main backend entry point:  
-https://github.com/onkarpatil7490/genai_data_quality/blob/main/project/dq_backend/main.py
 
 ## ✅ Next Steps
 - Define and manage data quality rules using natural language.  
