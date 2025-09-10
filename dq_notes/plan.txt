@@ -1,0 +1,63 @@
+1. The suggested llm could be processes as soon as the table is loaded in the backend
+2. Creating an rule suggestion agent, with which user can chat and create a rule
+3. When the sql query is generated and shown the use, it should have a button to show it 
+to user and it should show the number of rows getting affected because of the query
+
+what if user wants to query on the whole table
+what if multiple columns are to be affected - then maybe the whole table query could come
+could have two sections - per column and on the table
+
+we could have two agents - table agent and col agent,
+
+what user wants 
+it wants to create rules
+rules are either on one column or multiple columns
+one column - rules that just bother only that col
+multiple col - rules that bother multiple col
+
+for one col rule - need a agent that can take a col from the table and suggest rule or help create one
+for multiple col rule - need an agent that take a table and help create a rule 
+
+
+for now - 
+load a table 
+and create rule per column
+the rule will either be 
+1. created by ai - this is done
+2. suggested by ai - when user and ai chat - need to work on this - will do this later**
+    1. here the output of the ai should be what user asks for that column
+    2. also it should give rules, and when it gives, they should be able to export to the box where rules are written
+    3.
+    4.
+OR
+2. we will have a know all agent which can tell everything about the table and the selected column, and it can suggest ai rules are well, and like vs code we will insert it in the box
+for that we will create an ai agent which will fetch the rule out of it and get the rule and insert int the rule box
+this will be a floating window and will be on right hand side of the screen
+like left will be tables, middle rule generation, then the chat window
+what about data returned by the chat window?
+3. created by human - this is done
+
+once a rule is created - 
+1. sql query will be generated 
+2. if query is not able to be generated - it will ask for more clarity - need to work on this agent
+
+once a query is generated -
+1. it will be shown - will the user be able edit the query or not?
+1. it will run on the column and shown how many rows will be affected
+
+Steps - 
+Creating the (col)know all data agent - 
+Create agent that converts natural language rule to working sql query - 
+Create agent that suggests rules over a col - 
+
+
+Enhancement - study 
+1. data quality score setting
+2. the know all ai agent should also suggest rules - which could be added to the rule box - like code is added in vs code copilot
+3. in the window chat we can add suggestive questions like, what is percentage of null rows, etc??
+4. can add predefined rules on every column,
+5. rules that extend from column to column
+6. keep the ai response in chatbot very short, nobody likes long response
+7. streaming of chat
+8. ai response fine tuning - the know all should be told that you have access to table and tools, use them
+9. could give power to query to rule suggester to suggest rules
