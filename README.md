@@ -1,4 +1,4 @@
-# GenAI Data Quality API
+# GenAI Data Quality APIs
 
 This project provides an API server for managing and testing **data quality rules**.  
 Users can write rules in natural language, which are automatically converted to SQL, and then applied to validate or transform data as part of your ETL pipeline.  
